@@ -1,0 +1,14 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+gunicorn==23.0.0
+redis>=5.0.0
+langgraph>=0.2.50
+langchain-anthropic>=0.3.0
+langchain-core>=0.3.0
+google-auth>=2.35.0
+PyJWT>=2.9.0
+python-dotenv==1.0.1
+pydantic==2.10.3
+httpx==0.28.0
+structlog>=24.4.0
+sentry-sdk[fastapi]>=2.18.0

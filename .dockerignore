@@ -1,0 +1,39 @@
+# Don't ship secrets — Render/host injects env vars
+.env
+.env.*
+!.env.example
+
+# Local Python noise
+venv/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editor + OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Git + CI
+.git/
+.gitignore
+.github/
+
+# Logs + temp
+*.log
+*.tmp
+
+# Docs / scripts that shouldn't end up in the image
+README.md
+*.md
+start.sh

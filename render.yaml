@@ -1,0 +1,55 @@
+# Render declarative config. Commit this file and Render will provision both
+# the web service and Redis automatically when you "Blueprint deploy" the repo.
+#
+# After the first deploy, fill in the secrets marked `sync: false` from the
+# Render dashboard (Settings → Environment).
+
+services:
+  - type: web
+    name: finlo-backend
+    runtime: docker
+    plan: starter            # ~$7/mo. Bump to `standard` once you have traffic.
+    region: oregon           # Pick whichever region is closest to your users.
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENV
+        value: production
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: TIMEOUT
+        value: "120"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: finlo-redis
+          property: connectionString
+      # Secrets — fill in via Render dashboard (sync: false hides them from git).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      # Optional overrides
+      - key: CORS_ORIGINS
+        value: ""
+      - key: ACCESS_TOKEN_TTL_MIN
+        value: "15"
+      - key: REFRESH_TOKEN_TTL_DAYS
+        value: "30"
+      - key: MONTHLY_USD_CAP
+        value: "5.0"
+      - key: LOG_LEVEL
+        value: INFO
+
+  - type: redis
+    name: finlo-redis
+    plan: starter            # ~$10/mo, 25 MB. Plenty for rate-limit + tokens.
+    region: oregon
+    ipAllowList: []          # Empty = only internal Render services can reach it
+    maxmemoryPolicy: allkeys-lru
