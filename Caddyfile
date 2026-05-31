@@ -1,0 +1,37 @@
+# Caddy 2 config. Caddy auto-provisions and renews a Let's Encrypt certificate
+# for {$DOMAIN} as long as the DNS A record points at this host and ports
+# 80 + 443 are open in your EC2 security group.
+#
+# To switch domains: just change DOMAIN in the .env next to docker-compose.yml,
+# then `docker compose up -d caddy --force-recreate`.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# SSE chat endpoint needs flush_interval=-1 so chunks arrive in real time.
+	# Everything else uses default buffering.
+	@sse path /api/ai/chat
+	reverse_proxy @sse backend:8000 {
+		flush_interval -1
+		transport http {
+			read_timeout 5m
+			write_timeout 5m
+		}
+	}
+
+	reverse_proxy backend:8000
+
+	# Sensible production headers.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

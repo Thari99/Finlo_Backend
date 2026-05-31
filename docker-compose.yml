@@ -1,0 +1,83 @@
+# Production stack for a single EC2 instance:
+#   - finlo-backend  (FastAPI + LangGraph)
+#   - redis          (sidecar for rate limit, refresh tokens, cost guard)
+#   - caddy          (HTTPS reverse proxy, auto Let's Encrypt)
+#
+# Bring up:  docker compose up -d --build
+# Tail logs: docker compose logs -f backend
+# Stop:      docker compose down
+#
+# Required env vars on the host (or via an .env file next to this compose file):
+#   DOMAIN, ANTHROPIC_API_KEY, GOOGLE_CLIENT_ID, JWT_SECRET
+# Optional:
+#   SENTRY_DSN, ACCESS_TOKEN_TTL_MIN, REFRESH_TOKEN_TTL_DAYS, etc.
+
+services:
+  backend:
+    build: .
+    container_name: finlo-backend
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      ENV: production
+      WEB_CONCURRENCY: "2"
+      TIMEOUT: "120"
+      REDIS_URL: redis://redis:6379/0
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      JWT_SECRET: ${JWT_SECRET}
+      ACCESS_TOKEN_TTL_MIN: ${ACCESS_TOKEN_TTL_MIN:-15}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-30}
+      MONTHLY_USD_CAP: ${MONTHLY_USD_CAP:-5.0}
+      FREE_DAILY_LIMIT: ${FREE_DAILY_LIMIT:-10}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - finlo
+
+  redis:
+    image: redis:7-alpine
+    container_name: finlo-redis
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - finlo
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: finlo-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    networks:
+      - finlo
+
+networks:
+  finlo:
+    driver: bridge
+
+volumes:
+  redis_data:
+  caddy_data:
+  caddy_config:
