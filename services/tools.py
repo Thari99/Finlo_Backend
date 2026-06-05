@@ -18,17 +18,26 @@ from typing import Optional
 
 from langchain_core.tools import tool
 
-# Per-request snapshot bound by services.agent.stream_chat
-_snapshot: contextvars.ContextVar[dict] = contextvars.ContextVar("finlo_snapshot")
+# Per-request snapshot bound by services.agent.stream_chat.
+#
+# Note: we deliberately don't use reset(token). LangGraph's async streaming
+# runs the agent in a child asyncio context, and reset(token) must be called
+# in the same context where set() ran — otherwise it raises ValueError
+# ("token was created in a different context"). Each FastAPI request runs in
+# its own contextvars Context, so the value is naturally scoped per-request
+# and cleans up when the task ends.
+_snapshot: contextvars.ContextVar[dict] = contextvars.ContextVar(
+    "finlo_snapshot", default={}
+)
 
 
-def set_snapshot(data: dict):
-    """Returns a token to pass to reset_snapshot in a finally block."""
-    return _snapshot.set(data)
+def set_snapshot(data: dict) -> None:
+    _snapshot.set(data)
 
 
-def reset_snapshot(token) -> None:
-    _snapshot.reset(token)
+def reset_snapshot(_token=None) -> None:
+    """No-op kept for backwards compatibility with existing callers."""
+    pass
 
 
 # ── Internal helpers ─────────────────────────────────────────────────────────

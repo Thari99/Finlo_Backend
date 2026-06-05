@@ -106,14 +106,13 @@ async def stream_chat(
         user_message,
     )
 
-    token = agent_tools.set_snapshot(snapshot)
-    try:
-        async for msg_chunk, _meta in _agent.astream(
-            {"messages": messages},
-            stream_mode="messages",
-        ):
-            text = _extract_text(getattr(msg_chunk, "content", ""))
-            if text:
-                yield text
-    finally:
-        agent_tools.reset_snapshot(token)
+    # set_snapshot() doesn't return a token — FastAPI's per-request context
+    # auto-cleans the contextvar when the task ends. See services/tools.py.
+    agent_tools.set_snapshot(snapshot)
+    async for msg_chunk, _meta in _agent.astream(
+        {"messages": messages},
+        stream_mode="messages",
+    ):
+        text = _extract_text(getattr(msg_chunk, "content", ""))
+        if text:
+            yield text
