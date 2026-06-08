@@ -249,26 +249,31 @@ def list_bills(status: str = "upcoming", within_days: int = 30) -> str:
         return "The user has no bills tracked."
 
     cur = _default_currency()
-    now = _today()
-    cutoff = now + timedelta(days=within_days)
+    # Bills are date-shaped, not instant-shaped. Compare at day granularity so
+    # a bill due "today" doesn't flip to overdue as soon as the clock crosses
+    # midnight UTC (or get mis-labelled for users in +offset timezones whose
+    # local midnight stores as previous-day UTC).
+    today = _today().replace(hour=0, minute=0, second=0, microsecond=0)
+    cutoff = today + timedelta(days=within_days)
     lines: list[str] = []
 
     for b in bills:
-        due = _parse_date(b.get("due_date", ""))
-        if due is None:
+        due_dt = _parse_date(b.get("due_date", ""))
+        if due_dt is None:
             continue
-        days_until = (due - now).days
+        due = due_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        days_until = (due - today).days
         item = f"- {b.get('name','?')}: {_fmt_amount(float(b.get('amount',0)), cur)}"
         if status == "overdue":
-            if due < now:
+            if due < today:
                 item += f" (overdue {abs(days_until)}d)"
                 lines.append(item)
         elif status == "upcoming":
-            if now <= due <= cutoff:
-                item += f" (due in {days_until}d)" if days_until > 0 else " (due today)"
+            if today <= due <= cutoff:
+                item += " (due today)" if days_until == 0 else f" (due in {days_until}d)"
                 lines.append(item)
         else:  # all
-            if due < now:
+            if due < today:
                 item += f" (overdue {abs(days_until)}d)"
             elif days_until == 0:
                 item += " (due today)"
