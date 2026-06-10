@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 from config import ENV, SENTRY_DSN, cors_origins
-from routes import ai, auth
+from routes import ai, auth, ocr
 from services.logging_setup import configure_logging, logger
 
 # ── Logging + Sentry must come before app creation ──────────────────────────
@@ -59,6 +59,7 @@ async def add_request_context(request: Request, call_next):
 
 app.include_router(auth.router)
 app.include_router(ai.router)
+app.include_router(ocr.router)
 
 
 @app.get("/health")

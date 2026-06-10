@@ -12,3 +12,7 @@ pydantic==2.10.3
 httpx==0.28.0
 structlog>=24.4.0
 sentry-sdk[fastapi]>=2.18.0
+# Gemini vision OCR for bill scanning (POST /api/ocr/scan-bill).
+google-generativeai>=0.8.0
+# Required by FastAPI for multipart form uploads (UploadFile).
+python-multipart>=0.0.9

@@ -9,6 +9,16 @@ CLAUDE_MODEL      = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 CLAUDE_TIMEOUT_S  = int(os.getenv("CLAUDE_TIMEOUT_S", "60"))
 CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "1024"))
 
+# ── Gemini (bill scanning OCR) ───────────────────────────────────────────────
+GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL      = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_TIMEOUT_S  = int(os.getenv("GEMINI_TIMEOUT_S", "30"))
+# Reject uploads larger than this so a malicious client can't OOM the worker.
+OCR_MAX_IMAGE_MB  = int(os.getenv("OCR_MAX_IMAGE_MB", "8"))
+# Separate quota for OCR so a heavy chat user doesn't lock themselves out of
+# scanning (and vice-versa). Premium users get unlimited.
+OCR_FREE_DAILY_LIMIT = int(os.getenv("OCR_FREE_DAILY_LIMIT", "20"))
+
 # ── Google Sign-In ───────────────────────────────────────────────────────────
 GOOGLE_CLIENT_ID  = os.getenv("GOOGLE_CLIENT_ID", "")
 
@@ -47,6 +57,11 @@ LOG_LEVEL         = os.getenv("LOG_LEVEL", "INFO")
 # ── Validation ───────────────────────────────────────────────────────────────
 if not ANTHROPIC_API_KEY:
     raise RuntimeError("ANTHROPIC_API_KEY is not set in .env")
+if not GEMINI_API_KEY:
+    raise RuntimeError(
+        "GEMINI_API_KEY is not set in .env. Get one at "
+        "https://aistudio.google.com/apikey"
+    )
 if not GOOGLE_CLIENT_ID:
     raise RuntimeError("GOOGLE_CLIENT_ID is not set in .env")
 if not JWT_SECRET:
