@@ -25,6 +25,24 @@ router = APIRouter(prefix="/api/ocr", tags=["OCR"])
 _ALLOWED_MIME = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 
 
+def _sniff_mime(body: bytes) -> str:
+    """Return a MIME type from the file's magic header, or empty string if
+    unknown. Covers the formats our allowlist accepts.
+
+    Mobile multipart uploads frequently arrive with content-type
+    `application/octet-stream` (image_picker on Android does this), so we
+    sniff the actual bytes as a fallback before rejecting."""
+    if len(body) < 12:
+        return ""
+    if body.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if body.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if body[:4] == b"RIFF" and body[8:12] == b"WEBP":
+        return "image/webp"
+    return ""
+
+
 @router.post("/scan-bill")
 async def scan_bill(
     file: UploadFile = File(...),
@@ -45,8 +63,29 @@ async def scan_bill(
 
     # Reject non-image uploads early. Gemini would handle most of these but
     # we want a fast, predictable error for the client.
-    content_type = (file.content_type or "").lower()
+    raw_content_type = (file.content_type or "").lower().split(";", 1)[0].strip()
+    # Sniff the file header when the client didn't send a usable MIME — most
+    # often the case with multipart uploads from mobile picker libraries that
+    # default to application/octet-stream.
+    image_bytes = await file.read()
+    sniffed = _sniff_mime(image_bytes)
+    content_type = raw_content_type if raw_content_type in _ALLOWED_MIME else sniffed
+
+    logger.info(
+        "ocr.request",
+        user_id=user_id,
+        bytes=len(image_bytes),
+        raw_mime=raw_content_type,
+        sniffed_mime=sniffed,
+        resolved_mime=content_type,
+    )
+
     if content_type not in _ALLOWED_MIME:
+        logger.warning(
+            "ocr.bad_mime",
+            raw=raw_content_type,
+            sniffed=sniffed,
+        )
         raise HTTPException(
             status_code=400,
             detail="Unsupported file type. Use JPEG, PNG, or WEBP.",
@@ -54,13 +93,14 @@ async def scan_bill(
 
     # Read into memory with a hard cap so a giant upload can't OOM the worker.
     max_bytes = OCR_MAX_IMAGE_MB * 1024 * 1024
-    image_bytes = await file.read()
     if len(image_bytes) > max_bytes:
+        logger.warning("ocr.too_large", bytes=len(image_bytes))
         raise HTTPException(
             status_code=413,
             detail=f"Image is too large. Max {OCR_MAX_IMAGE_MB} MB.",
         )
     if len(image_bytes) < 1024:
+        logger.warning("ocr.too_small", bytes=len(image_bytes))
         raise HTTPException(
             status_code=400,
             detail="Image is too small to be a receipt.",
