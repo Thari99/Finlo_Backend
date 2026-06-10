@@ -11,7 +11,7 @@ CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "1024"))
 
 # ── Gemini (bill scanning OCR) ───────────────────────────────────────────────
 GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL      = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL      = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_TIMEOUT_S  = int(os.getenv("GEMINI_TIMEOUT_S", "30"))
 # Reject uploads larger than this so a malicious client can't OOM the worker.
 OCR_MAX_IMAGE_MB  = int(os.getenv("OCR_MAX_IMAGE_MB", "8"))
