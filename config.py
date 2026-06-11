@@ -11,13 +11,13 @@ CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "1024"))
 
 # ── Gemini (bill scanning OCR) ───────────────────────────────────────────────
 GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL      = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL      = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
 GEMINI_TIMEOUT_S  = int(os.getenv("GEMINI_TIMEOUT_S", "30"))
 # Reject uploads larger than this so a malicious client can't OOM the worker.
 OCR_MAX_IMAGE_MB  = int(os.getenv("OCR_MAX_IMAGE_MB", "8"))
 # Separate quota for OCR so a heavy chat user doesn't lock themselves out of
 # scanning (and vice-versa). Premium users get unlimited.
-OCR_FREE_DAILY_LIMIT = int(os.getenv("OCR_FREE_DAILY_LIMIT", "20"))
+OCR_FREE_DAILY_LIMIT = int(os.getenv("OCR_FREE_DAILY_LIMIT", "3"))
 
 # ── Google Sign-In ───────────────────────────────────────────────────────────
 GOOGLE_CLIENT_ID  = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -28,7 +28,7 @@ ACCESS_TOKEN_TTL_MIN  = int(os.getenv("ACCESS_TOKEN_TTL_MIN", "15"))
 REFRESH_TOKEN_TTL_DAYS = int(os.getenv("REFRESH_TOKEN_TTL_DAYS", "30"))
 
 # ── Quotas + cost guardrails ─────────────────────────────────────────────────
-FREE_DAILY_LIMIT       = int(os.getenv("FREE_DAILY_LIMIT", "10"))
+FREE_DAILY_LIMIT       = int(os.getenv("FREE_DAILY_LIMIT", "3"))
 # Hard pre-check: refuse any single request whose total input (system +
 # history + user message) exceeds this many characters. ~4 chars/token.
 MAX_INPUT_CHARS        = int(os.getenv("MAX_INPUT_CHARS", "80000"))

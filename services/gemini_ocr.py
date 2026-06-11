@@ -24,39 +24,34 @@ from services.logging_setup import logger
 genai.configure(api_key=GEMINI_API_KEY)
 _model = genai.GenerativeModel(GEMINI_MODEL)
 
-# We force JSON output via the response MIME type, so prompt can be terse.
-_PROMPT = """You are a bill/receipt parser. Look at this image and extract every field below.
-
-Return ONLY a single valid JSON object with this exact shape (no extra prose, no markdown):
-
+# Tight prompt — `response_mime_type: application/json` already forces a
+# single well-formed JSON object, so we don't need to repeat "no prose" verbosely.
+_PROMPT = """Parse this receipt image. Return JSON:
 {
-  "merchant": "store name as printed, or null",
-  "date": "YYYY-MM-DD if you can read it, else null",
-  "currency": "ISO 4217 code if visible (LKR, INR, USD, ...), else null",
-  "subtotal": number or null,
-  "tax": number or null,
-  "discount": number or null,
-  "total": number or null,
-  "items": [
-    {"description": "item name as printed", "quantity": number or null, "unit_price": number or null, "total": number}
-  ],
-  "confidence": number between 0.0 and 1.0 indicating how readable the receipt was
+  "merchant": str|null,
+  "date": "YYYY-MM-DD"|null,
+  "currency": "LKR"|"INR"|"USD"|"GBP"|...|null,
+  "subtotal": num|null,
+  "tax": num|null,
+  "discount": num|null,
+  "total": num,
+  "items": [{"description": str, "quantity": num|null, "unit_price": num|null, "total": num}],
+  "confidence": 0.0-1.0
 }
 
 Rules:
-- "total" is the FINAL amount the customer paid (after tax + discount).
-- "items" must include every line that is clearly a product/service line — exclude subtotal/tax/discount/total/change/cash rows.
-- If quantity isn't shown for a line, use 1.
-- If you genuinely cannot read a field, use null. Do not guess.
-- Numbers must be plain JSON numbers (no currency symbols, no quotes).
+- "total" = final amount paid (after tax/discount).
+- "items" = product/service lines only. Exclude subtotal/tax/discount/total/change rows.
+- Quantity default = 1.
+- Use null when unreadable. Plain numbers, no symbols.
 """
 
-# Safety + structured-output settings. JSON mode makes Gemini emit a single
-# well-formed JSON object so we don't have to strip prose ourselves.
+# Tighter generation config: lower max_output_tokens (most receipts produce
+# <800 tokens of JSON) and temperature 0 for deterministic + fast output.
 _GENERATION_CONFIG = {
     "response_mime_type": "application/json",
-    "temperature": 0.1,
-    "max_output_tokens": 2048,
+    "temperature": 0.0,
+    "max_output_tokens": 1024,
 }
 
 
