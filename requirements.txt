@@ -13,6 +13,8 @@ httpx==0.28.0
 structlog>=24.4.0
 sentry-sdk[fastapi]>=2.18.0
 # Gemini vision OCR for bill scanning (POST /api/ocr/scan-bill).
-google-generativeai>=0.8.0
+# Uses the new `google-genai` SDK (old `google-generativeai` is deprecated)
+# so we can tune `thinking_config` for faster structured-output responses.
+google-genai>=0.8.0
 # Required by FastAPI for multipart form uploads (UploadFile).
 python-multipart>=0.0.9

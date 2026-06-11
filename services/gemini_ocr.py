@@ -15,14 +15,16 @@ import re
 import time
 from typing import Any, Optional
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_TIMEOUT_S
 from services.logging_setup import logger
 
-# Configure once at import; the client is stateless.
-genai.configure(api_key=GEMINI_API_KEY)
-_model = genai.GenerativeModel(GEMINI_MODEL)
+# One client per process. The SDK keeps an HTTP/2 keep-alive pool internally,
+# so reusing the same client across requests saves the TLS + handshake
+# round-trip every call — meaningful at our latencies (~200ms RTT to Google).
+_client = genai.Client(api_key=GEMINI_API_KEY)
 
 # Tight prompt — `response_mime_type: application/json` already forces a
 # single well-formed JSON object, so we don't need to repeat "no prose" verbosely.
@@ -46,13 +48,16 @@ Rules:
 - Use null when unreadable. Plain numbers, no symbols.
 """
 
-# Tighter generation config: lower max_output_tokens (most receipts produce
-# <800 tokens of JSON) and temperature 0 for deterministic + fast output.
-_GENERATION_CONFIG = {
-    "response_mime_type": "application/json",
-    "temperature": 0.0,
-    "max_output_tokens": 1024,
-}
+# Gemini 2.5 models include internal "thinking" steps before generation —
+# valuable for math/code, useless for our structured OCR output. Disabling
+# them (`thinking_budget=0`) is typically the single biggest speedup for
+# JSON-shaped tasks like this, often 2-3× faster.
+_GENERATION_CONFIG = types.GenerateContentConfig(
+    response_mime_type="application/json",
+    temperature=0.0,
+    max_output_tokens=1024,
+    thinking_config=types.ThinkingConfig(thinking_budget=0),
+)
 
 
 class OcrError(Exception):
@@ -73,17 +78,16 @@ async def scan_receipt(image_bytes: bytes, mime_type: str) -> dict[str, Any]:
     """
     started = time.monotonic()
     try:
-        # generate_content is sync in the SDK; the route runs it inside
-        # FastAPI's threadpool by virtue of being an async def with await.
-        # For now we accept the blocking call — Gemini 2.0 Flash is fast
-        # enough (~1-2s) that a threadpool worker is fine.
-        response = _model.generate_content(
-            [
+        # New SDK exposes images via Part.from_bytes; same fundamental call
+        # shape otherwise. The async client is available, but our route is
+        # already running inside FastAPI's threadpool — sync is fine.
+        response = _client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[
                 _PROMPT,
-                {"mime_type": mime_type, "data": image_bytes},
+                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
             ],
-            generation_config=_GENERATION_CONFIG,
-            request_options={"timeout": GEMINI_TIMEOUT_S},
+            config=_GENERATION_CONFIG,
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("ocr.gemini_failed", err=str(e)[:200])
