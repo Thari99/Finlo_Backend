@@ -17,7 +17,7 @@ GEMINI_TIMEOUT_S  = int(os.getenv("GEMINI_TIMEOUT_S", "30"))
 OCR_MAX_IMAGE_MB  = int(os.getenv("OCR_MAX_IMAGE_MB", "8"))
 # Separate quota for OCR so a heavy chat user doesn't lock themselves out of
 # scanning (and vice-versa). Premium users get unlimited.
-OCR_FREE_DAILY_LIMIT = int(os.getenv("OCR_FREE_DAILY_LIMIT", "3"))
+OCR_FREE_DAILY_LIMIT = int(os.getenv("OCR_FREE_DAILY_LIMIT", "10"))
 
 # ── Google Sign-In ───────────────────────────────────────────────────────────
 GOOGLE_CLIENT_ID  = os.getenv("GOOGLE_CLIENT_ID", "")
