@@ -52,10 +52,15 @@ Rules:
 # valuable for math/code, useless for our structured OCR output. Disabling
 # them (`thinking_budget=0`) is typically the single biggest speedup for
 # JSON-shaped tasks like this, often 2-3× faster.
+#
+# max_output_tokens bumped to 4096: long restaurant bills with 20+ items
+# can produce ~1500-2500 JSON tokens; 1024 caused truncation → "bad_json".
+# At 4096 we cover even unusually long receipts. Empty trailing tokens
+# don't add latency, only the actual generated ones do.
 _GENERATION_CONFIG = types.GenerateContentConfig(
     response_mime_type="application/json",
     temperature=0.0,
-    max_output_tokens=1024,
+    max_output_tokens=4096,
     thinking_config=types.ThinkingConfig(thinking_budget=0),
 )
 
@@ -90,7 +95,15 @@ async def scan_receipt(image_bytes: bytes, mime_type: str) -> dict[str, Any]:
             config=_GENERATION_CONFIG,
         )
     except Exception as e:  # noqa: BLE001
-        logger.warning("ocr.gemini_failed", err=str(e)[:200])
+        err_str = str(e)
+        logger.warning("ocr.gemini_failed", err=err_str[:200])
+        # Quota / rate-limit errors are distinct from network failures —
+        # surface a specific message so the user knows to wait vs retry.
+        if "429" in err_str or "quota" in err_str.lower() or "rate" in err_str.lower():
+            raise OcrError(
+                "Scanning service is busy — please wait a minute and try again.",
+                code="rate_limited",
+            ) from e
         raise OcrError(
             "Couldn't reach the OCR provider. Try again in a moment.",
             code="provider_unreachable",
@@ -106,7 +119,14 @@ async def scan_receipt(image_bytes: bytes, mime_type: str) -> dict[str, Any]:
 
     data = _parse_json(raw)
     if data is None:
-        logger.warning("ocr.bad_json", raw_preview=raw[:200])
+        # Wider preview so we can tell truncation (no closing brace at end)
+        # apart from a malformed start — both look bad without enough context.
+        logger.warning(
+            "ocr.bad_json",
+            raw_preview_head=raw[:300],
+            raw_preview_tail=raw[-200:] if len(raw) > 300 else "",
+            raw_len=len(raw),
+        )
         raise OcrError(
             "Couldn't read the receipt — try a clearer, well-lit photo.",
             code="bad_json",
