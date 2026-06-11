@@ -9,7 +9,7 @@ google-auth>=2.35.0
 PyJWT>=2.9.0
 python-dotenv==1.0.1
 pydantic==2.10.3
-httpx==0.28.0
+httpx>=0.28.1
 structlog>=24.4.0
 sentry-sdk[fastapi]>=2.18.0
 # Gemini vision OCR for bill scanning (POST /api/ocr/scan-bill).
