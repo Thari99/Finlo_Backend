@@ -53,16 +53,35 @@ Rules:
 # them (`thinking_budget=0`) is typically the single biggest speedup for
 # JSON-shaped tasks like this, often 2-3× faster.
 #
+# `thinking_budget` was added in google-genai >= 1.4. If the installed SDK
+# is older (or the field gets renamed in a future version), fall back to a
+# config without it so the service still boots — the rest of our config
+# (low temp, capped tokens, JSON mode) gives most of the speedup anyway.
+#
 # max_output_tokens bumped to 4096: long restaurant bills with 20+ items
 # can produce ~1500-2500 JSON tokens; 1024 caused truncation → "bad_json".
-# At 4096 we cover even unusually long receipts. Empty trailing tokens
-# don't add latency, only the actual generated ones do.
-_GENERATION_CONFIG = types.GenerateContentConfig(
-    response_mime_type="application/json",
-    temperature=0.0,
-    max_output_tokens=4096,
-    thinking_config=types.ThinkingConfig(thinking_budget=0),
-)
+def _build_generation_config() -> types.GenerateContentConfig:
+    base_kwargs = dict(
+        response_mime_type="application/json",
+        temperature=0.0,
+        max_output_tokens=4096,
+    )
+    try:
+        return types.GenerateContentConfig(
+            **base_kwargs,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        )
+    except Exception as e:  # noqa: BLE001
+        # ValidationError / AttributeError / TypeError — depends on SDK version.
+        logger.warning(
+            "ocr.thinking_config_unsupported",
+            err=str(e)[:200],
+            hint="Upgrade google-genai to >=1.4 for the speed boost.",
+        )
+        return types.GenerateContentConfig(**base_kwargs)
+
+
+_GENERATION_CONFIG = _build_generation_config()
 
 
 class OcrError(Exception):
